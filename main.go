@@ -5,9 +5,9 @@ import (
 	"log"
 	"os"
 
+	"github.com/f100x/go-whatsapp-proxy/app/controllers"
+	"github.com/f100x/go-whatsapp-proxy/app/routes"
 	"github.com/gofiber/fiber/v2"
-	"github.com/hiddensetup/w/app/controllers"
-	"github.com/hiddensetup/w/app/routes"
 	"github.com/joho/godotenv"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	waLog "go.mau.fi/whatsmeow/util/log"

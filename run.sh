@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # kill prev copy if exists
-pkill -e -f wa
+pkill -e -f wam
 
 
 # start a new one
-./wa &
+./wam &
