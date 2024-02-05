@@ -1,4 +1,4 @@
-module github.com/f100x/go-whatsapp-proxy
+module github.com/hiddensetup/w
 
 go 1.18
 
