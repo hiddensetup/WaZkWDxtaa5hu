@@ -1,8 +1,9 @@
 package routes
 
 import (
-	"github.com/f100x/go-whatsapp-proxy/app/controllers"
-	"github.com/f100x/go-whatsapp-proxy/app/middlewares"
+	"github.com/hiddensetup/w/app/controllers"
+	"github.com/hiddensetup/w/app/middlewares"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
