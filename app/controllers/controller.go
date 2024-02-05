@@ -2,12 +2,12 @@ package controllers
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"os"
 	"os/exec"
 
-	"github.com/f100x/go-whatsapp-proxy/app/dto"
 	"github.com/gofiber/fiber/v2"
+	"github.com/hiddensetup/app/dto"
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store"
@@ -111,27 +111,41 @@ func (k *Controller) Logout(c *fiber.Ctx) error {
 	// Remove the whatsappstore.db file if it exists
 	if _, err := os.Stat("whatsappstore.db"); err == nil {
 		if err := os.Remove("whatsappstore.db"); err != nil {
-			// Handle the error more gracefully, log it, and continue
-			log.Printf("Error removing whatsappstore.db: %s", err)
+			k.client.Log.Errorf("Error removing whatsappstore.db: %s", err)
+			return c.JSON(dto.Response{Status: false})
 		}
 	}
 
 	// Log out the user
 	if k.client != nil {
 		if err := k.client.Logout(); err != nil {
-			// Handle the error more gracefully, return an error response
+			k.client.Log.Errorf("Error logging out: %s", err)
 			return c.JSON(dto.Response{Status: false})
 		}
 	}
 
 	// Run the run.sh script
-	cmd := exec.Command("./run.sh")
-	if err := cmd.Start(); err != nil {
-		// Handle the error more gracefully, return an error response
+	if err := k.runScript("./run.sh"); err != nil {
+		k.client.Log.Errorf("Error running run.sh script: %s", err)
 		return c.JSON(dto.Response{Status: false})
 	}
 
+	// Print success message on the screen
+	fmt.Println("Logout successful. Script executed successfully.")
+
 	return c.JSON(dto.Response{Status: true})
+}
+
+func (k *Controller) runScript(scriptPath string) error {
+	cmd := exec.Command("/bin/bash", "-c", scriptPath) // Use /bin/bash to interpret the script
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to run script: %w", err)
+	}
+
+	return nil
 }
 
 func (k *Controller) getDevice() *store.Device {
