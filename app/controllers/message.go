@@ -9,8 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/hiddensetup/w/app/dto"
-
+	"github.com/f100x/go-whatsapp-proxy/app/dto"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v2"
 	"go.mau.fi/whatsmeow"

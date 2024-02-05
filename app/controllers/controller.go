@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/f100x/go-whatsapp-proxy/app/dto"
 	"github.com/gofiber/fiber/v2"
-	"github.com/hiddensetup/w/app/dto"
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store"
