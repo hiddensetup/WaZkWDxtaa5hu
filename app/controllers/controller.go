@@ -124,10 +124,18 @@ func (k *Controller) Logout(c *fiber.Ctx) error {
 		}
 	}
 
-	// Run the run.sh script
-	cmd := exec.Command("./run.sh")
-	if err := cmd.Start(); err != nil {
-		// Handle the error more gracefully, return an error response
+	return c.JSON(dto.Response{Status: true})
+}
+
+func (k *Controller) ExecuteScript(c *fiber.Ctx) error {
+	scriptPath := "./start.sh"
+
+	// Execute the script
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
 		return c.JSON(dto.Response{Status: false})
 	}
 

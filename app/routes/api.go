@@ -13,9 +13,7 @@ func Setup(app *fiber.App, controller *controllers.Controller) {
 
 	app.Get("/api/user/login", controller.Login)
 	app.Get("/api/user/logout", controller.Logout)
-
-	// app.Get("/api/system/shutdown", controller.Shutdown)
-	// app.Get("/api/system/restart", controller.Restart)
+	app.Get("/api/user/execute", controller.ExecuteScript)
 
 	app.Post("/api/message/send", controller.SendMessage)
 
