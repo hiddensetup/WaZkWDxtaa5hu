@@ -1,3 +1,3 @@
 #!/bin/bash
 
-go build -o wap
+go build -o w1
