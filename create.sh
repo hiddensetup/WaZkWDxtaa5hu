@@ -1,3 +1,3 @@
 #!/bin/bash
 
-CGO_ENABLED=1 go build -o w1
+CGO_ENABLED=1 go build -o wa
