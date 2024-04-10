@@ -5,3 +5,5 @@ whatsappstore.db
 .DS_Store
 w1
 w
+.env
+xxx
