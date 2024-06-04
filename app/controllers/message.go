@@ -96,11 +96,11 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, erro
 			message.ImageMessage = &waProto.ImageMessage{
 				Caption:       proto.String(mess),
 				Mimetype:      proto.String(mimeType),
-				Url:           &resp.URL,
+				URL:           &resp.URL,
 				DirectPath:    &resp.DirectPath,
 				MediaKey:      resp.MediaKey,
-				FileEncSha256: resp.FileEncSHA256,
-				FileSha256:    resp.FileSHA256,
+				FileEncSHA256: resp.FileEncSHA256,
+				FileSHA256:    resp.FileSHA256,
 				FileLength:    &resp.FileLength,
 			}
 		case "audio/ogg":
@@ -121,11 +121,11 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, erro
 			message.AudioMessage = &waProto.AudioMessage{
 				//	Caption:       proto.String(""),
 				Mimetype:      proto.String(mimeType),
-				Url:           &resp.URL,
+				URL:           &resp.URL,
 				DirectPath:    &resp.DirectPath,
 				MediaKey:      resp.MediaKey,
-				FileEncSha256: resp.FileEncSHA256,
-				FileSha256:    resp.FileSHA256,
+				FileEncSHA256: resp.FileEncSHA256,
+				FileSHA256:    resp.FileSHA256,
 				FileLength:    &resp.FileLength,
 			}
 		case "video/mp4":
@@ -137,11 +137,11 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, erro
 			message.VideoMessage = &waProto.VideoMessage{
 				Caption:       proto.String(mess),
 				Mimetype:      proto.String(mimeType),
-				Url:           &resp.URL,
+				URL:           &resp.URL,
 				DirectPath:    &resp.DirectPath,
 				MediaKey:      resp.MediaKey,
-				FileEncSha256: resp.FileEncSHA256,
-				FileSha256:    resp.FileSHA256,
+				FileEncSHA256: resp.FileEncSHA256,
+				FileSHA256:    resp.FileSHA256,
 				FileLength:    &resp.FileLength,
 			}
 		default:
@@ -156,11 +156,11 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, erro
 				//Caption:       proto.String(""),
 				Title:         proto.String(u.Path),
 				Mimetype:      proto.String(mimeType),
-				Url:           &resp.URL,
+				URL:           &resp.URL,
 				DirectPath:    &resp.DirectPath,
 				MediaKey:      resp.MediaKey,
-				FileEncSha256: resp.FileEncSHA256,
-				FileSha256:    resp.FileSHA256,
+				FileEncSHA256: resp.FileEncSHA256,
+				FileSHA256:    resp.FileSHA256,
 				FileLength:    &resp.FileLength,
 				FileName:      proto.String(getFileName(u.Path)), // add this line to set the filename
 			}
