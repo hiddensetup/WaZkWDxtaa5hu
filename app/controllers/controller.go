@@ -18,74 +18,66 @@ import (
 type Controller struct {
 	dbContainer *sqlstore.Container
 	client      *whatsmeow.Client
+	qrCode      string // Updated to instance variable
 }
 
-var qrCode string
-
 func NewController(db *sqlstore.Container) *Controller {
-	cntrl := Controller{
+	cntrl := &Controller{
 		dbContainer: db,
+		qrCode:      "", // Initialize qrCode
 	}
 
 	clientLog := waLog.Stdout("Client", os.Getenv("LOG_LEVEL"), true)
 	cntrl.client = whatsmeow.NewClient(cntrl.getDevice(), clientLog)
 	cntrl.client.AddEventHandler(cntrl.eventHandler)
 
-	return &cntrl
+	return cntrl
 }
 
 func (k *Controller) Login(c *fiber.Ctx) error {
 	if k.client.Store.ID == nil {
 		// No ID stored, new login
 		if !k.client.IsConnected() {
-			err := k.client.Connect()
-
-			if err != nil {
+			if err := k.client.Connect(); err != nil {
 				k.client.Log.Errorf("WhatsApp connection error: %s", err.Error())
-
 				return c.SendStatus(500)
 			}
 		}
 
-		//go func() { k.qrChan
-		// client should be disconnected here
-		k.client.Disconnect()
-		// This must be called *before* Connect(). It will then listen to all the relevant events from the client.
+		k.client.Disconnect() // Disconnect before reconnecting
+
 		qrChan, err := k.client.GetQRChannel(context.Background())
-		err = k.client.Connect()
-		// connect should be after
 		if err != nil {
 			k.client.Log.Errorf("WhatsApp connection error: %s", err.Error())
-
 			return c.SendStatus(500)
 		}
+
+		if err := k.client.Connect(); err != nil {
+			k.client.Log.Errorf("WhatsApp connection error: %s", err.Error())
+			return c.SendStatus(500)
+		}
+
 		for evt := range qrChan {
 			if evt.Event == "code" {
-				//qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
-				qrCode = evt.Code
+				k.qrCode = evt.Code
 
-				if qrCode != "" {
-					qrCodeImg, err := qrcode.Encode(qrCode, qrcode.Medium, 500)
+				if k.qrCode != "" {
+					qrCodeImg, err := qrcode.Encode(k.qrCode, qrcode.Medium, 500)
 					if err != nil {
 						k.client.Log.Errorf("QR code generation error: %s", err.Error())
-
-						c.SendStatus(500)
+						return c.SendStatus(500)
 					}
 
 					return c.Send(qrCodeImg)
 				}
 			} else {
-				// login event that we do not catch
-				//qrCode = ""
-				break
+				break // Exit loop on any event other than "code"
 			}
 		}
-
 	} else {
 		// Already logged in, just connect
 		if err := k.Autologin(); err != nil {
 			k.client.Log.Errorf("WhatsApp connection error: %s", err.Error())
-
 			return c.SendStatus(500)
 		}
 
