@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/hiddensetup/w/app/dto"
-	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types/events"
 )
 
@@ -200,7 +200,7 @@ func (k *Controller) proxyToChatApp(message dto.IncomingMessage, attachment ...d
 	return string(content)
 }
 
-func getFilename(mediaType string, message *waProto.Message) string {
+func getFilename(mediaType string, message *waE2E.Message) string {
 	switch mediaType {
 	case "sticker":
 		return hash(message.StickerMessage.String()) + ".webp"

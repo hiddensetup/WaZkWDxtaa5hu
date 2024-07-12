@@ -13,7 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/hiddensetup/w/app/dto"
 	"go.mau.fi/whatsmeow"
-	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
 )
@@ -60,27 +60,24 @@ func (k *Controller) LastMessage(c *fiber.Ctx) error {
 	return c.JSON(messageList[l-1])
 }
 
-func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, error) {
-	message := &waProto.Message{}
+func (k *Controller) makeMessage(input *whatsappMessage) (*waE2E.Message, error) {
+	message := &waE2E.Message{}
 
 	if len(input.Media) > 0 {
 		resp, err := http.Get(input.Media)
 		if err != nil {
-			return nil, errors.New("error getting media file by URL")
+			return nil, errors.New("error getting media file by URL: " + err.Error())
 		}
 		defer resp.Body.Close()
 
 		file, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, errors.New("error reading file body")
+			return nil, errors.New("error reading file body: " + err.Error())
 		}
 
 		mtype := mimetype.Detect(file)
 		mimeType := mtype.String()
-		mess := ""
-		if len(input.Message) > 0 {
-			mess = input.Message
-		}
+		mess := input.Message
 
 		switch mimeType {
 		case "image/jpeg", "image/png":
@@ -89,7 +86,7 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, erro
 				return nil, errors.New("error uploading image: " + err.Error())
 			}
 
-			message.ImageMessage = &waProto.ImageMessage{
+			message.ImageMessage = &waE2E.ImageMessage{
 				Caption:       proto.String(mess),
 				Mimetype:      proto.String(mimeType),
 				URL:           &resp.URL,
@@ -103,10 +100,10 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, erro
 		case "audio/ogg", "audio/mp3", "audio/mp4", "audio/mpeg", "audio/amr":
 			resp, err := k.client.Upload(context.Background(), file, whatsmeow.MediaAudio)
 			if err != nil {
-				return nil, errors.New("error uploading audio file")
+				return nil, errors.New("error uploading audio file: " + err.Error())
 			}
 
-			message.AudioMessage = &waProto.AudioMessage{
+			message.AudioMessage = &waE2E.AudioMessage{
 				Mimetype:      proto.String(mimeType),
 				URL:           &resp.URL,
 				DirectPath:    &resp.DirectPath,
@@ -119,10 +116,10 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, erro
 		case "video/mp4":
 			resp, err := k.client.Upload(context.Background(), file, whatsmeow.MediaVideo)
 			if err != nil {
-				return nil, errors.New("error uploading video file")
+				return nil, errors.New("error uploading video file: " + err.Error())
 			}
 
-			message.VideoMessage = &waProto.VideoMessage{
+			message.VideoMessage = &waE2E.VideoMessage{
 				Caption:       proto.String(mess),
 				Mimetype:      proto.String(mimeType),
 				URL:           &resp.URL,
@@ -136,13 +133,13 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, erro
 		default:
 			resp, err := k.client.Upload(context.Background(), file, whatsmeow.MediaDocument)
 			if err != nil {
-				return nil, errors.New("error uploading document file")
+				return nil, errors.New("error uploading document file: " + err.Error())
 			}
 
 			u, _ := url.ParseRequestURI(input.Media)
 
-			message.DocumentMessage = &waProto.DocumentMessage{
-				Title:         proto.String(u.Path),
+			message.DocumentMessage = &waE2E.DocumentMessage{
+				Title:         proto.String(getFileName(u.Path)),
 				Mimetype:      proto.String(mimeType),
 				URL:           &resp.URL,
 				DirectPath:    &resp.DirectPath,
