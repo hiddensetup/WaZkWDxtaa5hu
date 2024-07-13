@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v2"
@@ -64,10 +65,17 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waE2E.Message, error)
 	message := &waE2E.Message{}
 
 	if len(input.Media) > 0 {
-		resp, err := http.Get(input.Media)
+		// Create a new HTTP client with a timeout
+		client := &http.Client{
+			Timeout: 90 * time.Second,
+		}
+
+		// Use the client to make the GET request
+		resp, err := client.Get(input.Media)
 		if err != nil {
 			return nil, errors.New("error getting media file by URL: " + err.Error())
 		}
+
 		defer resp.Body.Close()
 
 		file, err := io.ReadAll(resp.Body)

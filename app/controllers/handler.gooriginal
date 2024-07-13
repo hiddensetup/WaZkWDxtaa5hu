@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -85,39 +84,25 @@ func (k *Controller) eventHandler(evt interface{}) {
 				quotedContent := fmt.Sprintf("%s\n%s", participant, quotedConversation)
 
 				// Add media attachment if available for quoted message
-				attachmentHandlers := map[string]func(*waE2E.Message){
-					"image": func(m *waE2E.Message) {
-						attachment.File, _ = k.client.DownloadAny(m)
-						attachment.Filename = getFilename("image", m)
-					},
-					"video": func(m *waE2E.Message) {
-						attachment.File, _ = k.client.DownloadAny(m)
-						attachment.Filename = getFilename("video", m)
-					},
-					"audio": func(m *waE2E.Message) {
-						attachment.File, _ = k.client.DownloadAny(m)
-						attachment.Filename = getFilename("audio", m)
-					},
-					"location": func(m *waE2E.Message) {
-						mapsUrl := "https://maps.google.com"
-						latitude := *m.LocationMessage.DegreesLatitude
-						longitude := *m.LocationMessage.DegreesLongitude
-						locationUrl := fmt.Sprintf("%s/?q=%f,%f", mapsUrl, latitude, longitude)
-						quotedContent = fmt.Sprintf("%s %s\n", quotedContent, locationUrl)
-					},
-				}
-
 				if quotedMsg.ImageMessage != nil {
-					attachmentHandlers["image"](quotedMsg)
+					attachment.File, _ = k.client.DownloadAny(quotedMsg)
+					attachment.Filename = getFilename("image", quotedMsg)
 				}
 				if quotedMsg.VideoMessage != nil {
-					attachmentHandlers["video"](quotedMsg)
+					attachment.File, _ = k.client.DownloadAny(quotedMsg)
+					attachment.Filename = getFilename("video", quotedMsg)
 				}
 				if quotedMsg.AudioMessage != nil {
-					attachmentHandlers["audio"](quotedMsg)
+					attachment.File, _ = k.client.DownloadAny(quotedMsg)
+					attachment.Filename = getFilename("audio", quotedMsg)
 				}
 				if quotedMsg.LocationMessage != nil {
-					attachmentHandlers["location"](quotedMsg)
+					mapsUrl := "https://maps.google.com"
+					latitude := *quotedMsg.LocationMessage.DegreesLatitude
+					longitude := *quotedMsg.LocationMessage.DegreesLongitude
+					locationUrl := fmt.Sprintf("%s/?q=%f,%f", mapsUrl, latitude, longitude)
+					// Update quotedContent to include the location URL
+					quotedContent = fmt.Sprintf("%s %s\n", quotedContent, locationUrl)
 				}
 
 				if mess.IsGroup {
@@ -143,27 +128,27 @@ func (k *Controller) eventHandler(evt interface{}) {
 
 		if v.Message.ContactMessage != nil {
 			s := *v.Message.ContactMessage.Vcard
-
-			// Helper function to extract values based on the pattern
-			extractValue := func(pattern string, s string) string {
-				re := regexp.MustCompile(pattern)
-				matches := re.FindStringSubmatch(s)
-				if len(matches) > 1 {
-					return strings.TrimSpace(matches[1])
+			waEmail := ""
+			waPhone := ""
+			indx := strings.Index(s, "TEL")
+			if indx >= 0 {
+				waPhone = s[indx:]
+				indx = strings.Index(waPhone, ":")
+				indx2 := strings.Index(waPhone, "\n")
+				waPhone = waPhone[indx+1 : indx2]              // phone contact
+				waPhone = strings.ReplaceAll(waPhone, " ", "") // remove spaces from phone number
+				waPhone = strings.ReplaceAll(waPhone, "-", "") // remove dashes from phone number
+			}
+			indx = strings.Index(s, "EMAIL")
+			waEmail = func() string {
+				if indx >= 0 {
+					return s[indx+1 : strings.Index(s[indx+1:], "\n")+indx+1]
 				}
 				return ""
-			}
-
-			waPhone := extractValue(`TEL.*?:(.+)`, s)
-			waPhone = strings.ReplaceAll(waPhone, " ", "") // remove spaces from phone number
-			waPhone = strings.ReplaceAll(waPhone, "-", "") // remove dashes from phone number
-
-			waEmail := extractValue(`EMAIL.*?:(.+)`, s)
+			}()
 			contactName := *v.Message.ContactMessage.DisplayName
-
-			mess.Conversation = fmt.Sprintf("*%s*\n%s\n%s", contactName, waPhone, waEmail)
+			mess.Conversation = "*" + contactName + "*" + "\n" + waPhone + "\n" + waEmail
 			mess.Caption = contactName
-
 		}
 
 		if v.Message.LocationMessage != nil {
@@ -221,126 +206,84 @@ func (k *Controller) eventHandler(evt interface{}) {
 }
 
 func (k *Controller) proxyToChatApp(message dto.IncomingMessage, attachment ...dto.MessageAttachment) string {
-	client := &http.Client{Timeout: time.Second * 10}
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
 
 	// New multipart writer.
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	// Encode message fields.
-	if err := encodeFields(writer, message); err != nil {
-		k.client.Log.Errorf("Encoding message fields error: %s", err)
-		return ""
+	v := reflect.ValueOf(message)
+	typeOfS := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		var fw io.Writer
+		var err error
+		if fw, err = writer.CreateFormField(typeOfS.Field(i).Name); err != nil {
+			continue
+		}
+		if _, err = io.Copy(fw, strings.NewReader(fmt.Sprintf("%v", v.Field(i).Interface()))); err != nil {
+			continue
+		}
 	}
 
-	// Handle attachment if provided.
-	if len(attachment) > 0 && !attachment[0].IsEmpty() {
-		if err := addAttachment(writer, attachment[0]); err != nil {
-			k.client.Log.Errorf("Adding attachment error: %s", err)
-			return ""
+	if !attachment[0].IsEmpty() {
+		fw, err := writer.CreateFormFile("attachment", attachment[0].Filename)
+		if err != nil {
+			k.client.Log.Errorf("POST2PROXY make attachment err: %s", err)
+		}
+
+		_, err = io.Copy(fw, bytes.NewReader(attachment[0].File))
+		if err != nil {
+			k.client.Log.Errorf("POST2PROXY make attachment err: %s", err)
 		}
 	}
 
 	writer.Close()
-
-	// Create and send request.
-	req, err := http.NewRequest("POST", os.Getenv("PROXY_URL"), body)
+	req, err := http.NewRequest("POST", os.Getenv("PROXY_URL"), bytes.NewReader(body.Bytes()))
 	if err != nil {
-		k.client.Log.Errorf("Creating request error: %s", err)
-		return ""
+		k.client.Log.Errorf("POST2PROXY err: %s", err)
 	}
 
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		k.client.Log.Errorf("Request error or status not OK: %s, status: %d", err, resp.StatusCode)
-		return ""
+	resp, _ := client.Do(req)
+	if resp.StatusCode != http.StatusOK {
+		k.client.Log.Errorf("POST2PROXY request failed with response code: %d", resp.StatusCode)
 	}
 
 	content, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		k.client.Log.Errorf("Reading response body error: %s", err)
-		return ""
+		k.client.Log.Errorf("POST2PROXY reading body err: %s", err)
 	}
 
 	return string(content)
 }
 
-func encodeFields(writer *multipart.Writer, message dto.IncomingMessage) error {
-	v := reflect.ValueOf(message)
-	typeOfS := v.Type()
-
-	for i := 0; i < v.NumField(); i++ {
-		fw, err := writer.CreateFormField(typeOfS.Field(i).Name)
-		if err != nil {
-			return err
-		}
-		if _, err = io.Copy(fw, strings.NewReader(fmt.Sprintf("%v", v.Field(i).Interface()))); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func addAttachment(writer *multipart.Writer, attachment dto.MessageAttachment) error {
-	fw, err := writer.CreateFormFile("attachment", attachment.Filename)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(fw, bytes.NewReader(attachment.File))
-	return err
-}
-
 func getFilename(mediaType string, message *waE2E.Message) string {
-	type fileExtractor func() string
-
-	// Map MIME types to file extensions
-	mimeToExt := map[string]string{
-		"image/jpeg": "jpg",
-		"image/png":  "png",
-		"image/gif":  "gif",
-		"video/mp4":  "mp4",
-		"audio/ogg":  "ogg",
-		"audio/mp3":  "mp3",
+	switch mediaType {
+	case "sticker":
+		return hash(message.StickerMessage.String()) + ".webp"
+	case "gif":
+		return hash(message.VideoMessage.String()) + ".mp4"
+	case "image":
+		return hash(message.ImageMessage.String()) + "." + message.ImageMessage.GetMimetype()[6:]
+	case "video":
+		return hash(message.VideoMessage.String()) + ".mp4"
+	case "document":
+		return message.DocumentMessage.GetFileName()
+	case "vcard":
+		return message.ContactMessage.GetDisplayName() + ""
+	case "ptt":
+		return hash(message.AudioMessage.String()) + ".ogg"
+	case "audio":
+		return hash(message.AudioMessage.String()) + ".mp3"
+	case "product":
+		return message.ProductMessage.String() + ".jpg"
+	default:
+		return ""
 	}
-
-	// File extractors for different media types
-	extractors := map[string]fileExtractor{
-		"sticker": func() string { return hash(message.StickerMessage.String()) + ".webp" },
-		"gif":     func() string { return hash(message.VideoMessage.String()) + ".mp4" },
-		"image": func() string {
-			mimeType := message.ImageMessage.GetMimetype()
-			ext, exists := mimeToExt[mimeType]
-			if !exists {
-				ext = "png" // default to jpg if MIME type is unknown
-			}
-			return hash(message.ImageMessage.String()) + "." + ext
-		},
-		"video": func() string { return hash(message.VideoMessage.String()) + ".mp4" },
-		"document": func() string {
-			if message.DocumentMessage != nil {
-				return message.DocumentMessage.GetFileName()
-			}
-			return ""
-		},
-		"vcard": func() string { return message.ContactMessage.GetDisplayName() + ".vcf" },
-		"ptt":   func() string { return hash(message.AudioMessage.String()) + ".ogg" },
-		"audio": func() string { return hash(message.AudioMessage.String()) + ".mp3" },
-		"product": func() string {
-			if message.ProductMessage != nil {
-				return message.ProductMessage.String() + ".jpg"
-			}
-			return ""
-		},
-	}
-
-	if extractor, exists := extractors[mediaType]; exists {
-		return extractor()
-	}
-
-	return ""
 }
-
 func hash(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
