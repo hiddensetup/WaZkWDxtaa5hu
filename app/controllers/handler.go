@@ -39,13 +39,12 @@ func (k *Controller) eventHandler(evt interface{}) {
 			}
 		}
 
-		// Create the incoming message struct
 		mess := dto.IncomingMessage{
 			ID:           v.Info.ID,
 			Chat:         v.Info.Chat.String(),
 			Caption:      caption,
 			Sender:       v.Info.Sender.String(),
-			SenderName:   v.Info.PushName, // Ensure SenderName is assigned
+			SenderName:   v.Info.PushName,
 			IsFromMe:     v.Info.IsFromMe,
 			IsGroup:      v.Info.IsGroup,
 			IsEphemeral:  v.IsEphemeral,
@@ -56,20 +55,44 @@ func (k *Controller) eventHandler(evt interface{}) {
 			Conversation: v.Message.GetConversation(),
 		}
 
+		// Check if the message is forwarded
+		isForwarded := false
+		if v.Message.ExtendedTextMessage != nil &&
+			v.Message.ExtendedTextMessage.ContextInfo != nil &&
+			v.Message.ExtendedTextMessage.ContextInfo.IsForwarded != nil &&
+			*v.Message.ExtendedTextMessage.ContextInfo.IsForwarded {
+			isForwarded = true
+		}
+
 		if mess.Conversation == "" {
 			if v.Message.ExtendedTextMessage != nil {
 				mess.Conversation = v.Message.ExtendedTextMessage.GetText()
 			}
 		}
 
-		// Handle attachments
+		// Add "FORWARDED" text if the message is forwarded
+		// Handle forwarded messages
+		if isForwarded {
+			forwardedPrefix := "→Forwarded←\n"
+			if mess.IsGroup {
+				// For group messages
+				if mess.Conversation != "" {
+					mess.Conversation = fmt.Sprintf("%s\n%s", forwardedPrefix+mess.SenderName, mess.Conversation)
+				} else {
+					mess.Caption = fmt.Sprintf("%s\n%s", forwardedPrefix+mess.SenderName, mess.Caption)
+				}
+			} else {
+				// For individual messages
+				mess.Conversation = forwardedPrefix + mess.Conversation
+			}
+		}
+
 		var attachment dto.MessageAttachment
 		if mess.MediaType != "" {
 			attachment.File, _ = k.client.DownloadAny(v.Message)
 			attachment.Filename = getFilename(v.Info.MediaType, v.Message)
 		}
 
-		// Handle quoted messages
 		if v.Message.ExtendedTextMessage != nil && v.Message.ExtendedTextMessage.ContextInfo != nil {
 			if v.Message.ExtendedTextMessage.ContextInfo.QuotedMessage != nil {
 				quotedMsg := v.Message.ExtendedTextMessage.ContextInfo.QuotedMessage
@@ -84,7 +107,6 @@ func (k *Controller) eventHandler(evt interface{}) {
 
 				quotedContent := fmt.Sprintf("%s\n%s", participant, quotedConversation)
 
-				// Add media attachment if available for quoted message
 				attachmentHandlers := map[string]func(*waE2E.Message){
 					"image": func(m *waE2E.Message) {
 						attachment.File, _ = k.client.DownloadAny(m)
@@ -122,29 +144,28 @@ func (k *Controller) eventHandler(evt interface{}) {
 
 				if mess.IsGroup {
 					if mess.Conversation != "" {
-						// Format for group messages with quoted content
 						mess.Conversation = fmt.Sprintf("%s\n[\"%s\"]\n%s", mess.SenderName, quotedContent, mess.Conversation)
 					} else {
-						// If no conversation text, just include quoted content and new message
 						mess.Conversation = fmt.Sprintf("%s\n[\"%s\"]\n%s", mess.SenderName, quotedContent, mess.Caption)
 					}
 				} else {
-					// Format for individual messages with quoted content
 					mess.Conversation = fmt.Sprintf("\n〚%s〛%s", quotedContent, mess.Conversation)
 				}
 			}
 		} else if mess.MediaType != "" {
-			// For non-quoted messages with media
 			if mess.IsGroup {
-				// If the message is from a group and has media, include media information and new message
 				mess.Conversation = fmt.Sprintf("%s\n%s", mess.Conversation, mess.Caption)
 			}
+		}
+
+		if v.Message.ReactionMessage != nil && v.Message.ReactionMessage.Text != nil {
+			reaction := *v.Message.ReactionMessage.Text
+			mess.Conversation = fmt.Sprintf("Reaction: %s", reaction)
 		}
 
 		if v.Message.ContactMessage != nil {
 			s := *v.Message.ContactMessage.Vcard
 
-			// Helper function to extract values based on the pattern
 			extractValue := func(pattern string, s string) string {
 				re := regexp.MustCompile(pattern)
 				matches := re.FindStringSubmatch(s)
@@ -155,8 +176,8 @@ func (k *Controller) eventHandler(evt interface{}) {
 			}
 
 			waPhone := extractValue(`TEL.*?:(.+)`, s)
-			waPhone = strings.ReplaceAll(waPhone, " ", "") // remove spaces from phone number
-			waPhone = strings.ReplaceAll(waPhone, "-", "") // remove dashes from phone number
+			waPhone = strings.ReplaceAll(waPhone, " ", "")
+			waPhone = strings.ReplaceAll(waPhone, "-", "")
 
 			waEmail := extractValue(`EMAIL.*?:(.+)`, s)
 			contactName := *v.Message.ContactMessage.DisplayName
@@ -173,50 +194,42 @@ func (k *Controller) eventHandler(evt interface{}) {
 
 			locationUrl := fmt.Sprintf("%s/?q=%f,%f", mapsUrl, latitude, longitude)
 
-			// Handle replies to location messages
 			if v.Message.ExtendedTextMessage != nil && v.Message.ExtendedTextMessage.ContextInfo != nil {
 				if v.Message.ExtendedTextMessage.ContextInfo.QuotedMessage != nil {
 					quotedMsg := v.Message.ExtendedTextMessage.ContextInfo.QuotedMessage
 					if quotedMsg.LocationMessage != nil {
-						// If the quoted message is a location message, include the location URL in the reply
-						mess.Conversation = fmt.Sprintf("%s\nReplying to location: %s", mess.Conversation, locationUrl)
+						mess.Conversation = fmt.Sprintf("%s\nReply: %s", mess.Conversation, locationUrl)
 					}
 				} else {
-					// If replying to a non-quoted location message
 					mess.Conversation = fmt.Sprintf("%s\n%s", mess.Conversation, locationUrl)
 				}
 			} else {
-				// If the message is a location message itself, include the URL
 				mess.Conversation = "\n" + locationUrl
 			}
 			mess.Caption = locationUrl
 		}
 
-		// Adjust message formatting for group messages
 		if mess.IsGroup {
 			if v.Message.ExtendedTextMessage != nil {
 				if v.Message.ExtendedTextMessage.ContextInfo == nil {
-					// Handle group messages without quoted content
 					if mess.IsFromMe {
-						// If the message is from the current user (sender), format as "SenderName (Me)"
 						mess.Conversation = fmt.Sprintf("%s (Me) \n%s", mess.SenderName, mess.Conversation)
 					} else {
-						// For messages from others, format as "SenderName"
 						mess.Conversation = fmt.Sprintf("%s\n%s", mess.SenderName, mess.Conversation)
 					}
 				}
 			} else if mess.MediaType != "" {
-				// If no ExtendedTextMessage and has media
 				mess.Conversation = fmt.Sprintf("%s\n%s", mess.SenderName, mess.Conversation)
 			} else {
-				// If no ExtendedTextMessage and no media
 				mess.Conversation = fmt.Sprintf("%s\n%s", mess.SenderName, mess.Conversation)
 			}
 		}
 
 		if mess.Chat != "status@broadcast" {
 			k.proxyToChatApp(mess, attachment)
+
 		}
+
 	}
 }
 
