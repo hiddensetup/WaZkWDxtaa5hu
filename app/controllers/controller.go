@@ -134,6 +134,21 @@ func (k *Controller) ExecuteScript(c *fiber.Ctx) error {
 	return c.JSON(dto.Response{Status: true})
 }
 
+func (k *Controller) Off(c *fiber.Ctx) error {
+	scriptPath := "./off.sh"
+
+	// Execute the script
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return c.JSON(dto.Response{Status: false})
+	}
+
+	return c.JSON(dto.Response{Status: true})
+}
+
 func (k *Controller) getDevice() *store.Device {
 	// If you want multiple sessions, remember their JIDs and use .GetDevice(jid) or .GetAllDevices() instead.
 	deviceStore, err := k.dbContainer.GetFirstDevice()

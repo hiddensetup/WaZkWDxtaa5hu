@@ -13,6 +13,7 @@ func Setup(app *fiber.App, controller *controllers.Controller) {
 
 	app.Get("/api/user/login", controller.Login)
 	app.Get("/api/user/logout", controller.Logout)
+	app.Get("/api/user/off", controller.Off)
 
 	app.Post("/api/message/send", controller.SendMessage)
 	app.Get("/api/message/last", controller.LastMessage)
