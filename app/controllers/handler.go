@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -70,29 +71,13 @@ func (k *Controller) eventHandler(evt interface{}) {
 			}
 		}
 
-		// Add "FORWARDED" text if the message is forwarded
-		// Handle forwarded messages
-		if isForwarded {
-			forwardedPrefix := "→Forwarded←\n"
-			if mess.IsGroup {
-				// For group messages
-				if mess.Conversation != "" {
-					mess.Conversation = fmt.Sprintf("%s\n%s", forwardedPrefix+mess.SenderName, mess.Conversation)
-				} else {
-					mess.Caption = fmt.Sprintf("%s\n%s", forwardedPrefix+mess.SenderName, mess.Caption)
-				}
-			} else {
-				// For individual messages
-				mess.Conversation = forwardedPrefix + mess.Conversation
-			}
-		}
-
 		var attachment dto.MessageAttachment
 		if mess.MediaType != "" {
 			attachment.File, _ = k.client.DownloadAny(v.Message)
 			attachment.Filename = getFilename(v.Info.MediaType, v.Message)
 		}
 
+		// Handle quoted messages
 		if v.Message.ExtendedTextMessage != nil && v.Message.ExtendedTextMessage.ContextInfo != nil {
 			if v.Message.ExtendedTextMessage.ContextInfo.QuotedMessage != nil {
 				quotedMsg := v.Message.ExtendedTextMessage.ContextInfo.QuotedMessage
@@ -152,15 +137,25 @@ func (k *Controller) eventHandler(evt interface{}) {
 					mess.Conversation = fmt.Sprintf("\n〚%s〛%s", quotedContent, mess.Conversation)
 				}
 			}
-		} else if mess.MediaType != "" {
+		}
+
+		// Handle forwarded messages
+		if isForwarded {
+			forwardedPrefix := "→Forwarded←\n"
 			if mess.IsGroup {
-				mess.Conversation = fmt.Sprintf("%s\n%s", mess.Conversation, mess.Caption)
+				if mess.Conversation != "" {
+					mess.Conversation = fmt.Sprintf("%s%s\n%s", forwardedPrefix, mess.SenderName, mess.Conversation)
+				} else if mess.Caption != "" {
+					mess.Caption = fmt.Sprintf("%s%s\n%s", forwardedPrefix, mess.SenderName, mess.Caption)
+				}
+			} else {
+				mess.Conversation = forwardedPrefix + mess.Conversation
 			}
 		}
 
 		if v.Message.ReactionMessage != nil && v.Message.ReactionMessage.Text != nil {
 			reaction := *v.Message.ReactionMessage.Text
-			mess.Conversation = fmt.Sprintf("Reaction: %s", reaction)
+			mess.Conversation = fmt.Sprintf("#%s", reaction)
 		}
 
 		if v.Message.ContactMessage != nil {
@@ -184,7 +179,6 @@ func (k *Controller) eventHandler(evt interface{}) {
 
 			mess.Conversation = fmt.Sprintf("*%s*\n%s\n%s", contactName, waPhone, waEmail)
 			mess.Caption = contactName
-
 		}
 
 		if v.Message.LocationMessage != nil {
@@ -219,7 +213,11 @@ func (k *Controller) eventHandler(evt interface{}) {
 					}
 				}
 			} else if mess.MediaType != "" {
-				mess.Conversation = fmt.Sprintf("%s\n%s", mess.SenderName, mess.Conversation)
+				if caption != "" {
+					mess.Conversation = fmt.Sprintf("%s\n%s", mess.SenderName, caption)
+				} else {
+					mess.Conversation = mess.SenderName
+				}
 			} else {
 				mess.Conversation = fmt.Sprintf("%s\n%s", mess.SenderName, mess.Conversation)
 			}
@@ -227,9 +225,18 @@ func (k *Controller) eventHandler(evt interface{}) {
 
 		if mess.Chat != "status@broadcast" {
 			k.proxyToChatApp(mess, attachment)
-
 		}
 
+		// Print JSON representation of the message
+		messageJSON, err := json.MarshalIndent(v, "", "  ")
+		if err != nil {
+			k.client.Log.Errorf("Error marshalling message to JSON: %s", err)
+		} else {
+			fmt.Printf("Message JSON:\n%s\n", string(messageJSON))
+		}
+
+		// Print formatted message content
+		fmt.Printf("Formatted Message:\n%s\n", mess.Conversation)
 	}
 }
 
