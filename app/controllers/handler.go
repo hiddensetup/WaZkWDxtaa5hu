@@ -17,11 +17,12 @@ import (
 	"time"
 
 	"github.com/hiddensetup/w/app/dto"
-	"go.mau.fi/whatsmeow/proto/waE2E"
+	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"go.mau.fi/whatsmeow/types/events"
 )
 
 var messageList []events.Message
+var enableGroupHandling bool = true
 
 func (k *Controller) eventHandler(evt interface{}) {
 	switch v := evt.(type) {
@@ -47,7 +48,7 @@ func (k *Controller) eventHandler(evt interface{}) {
 			Sender:       v.Info.Sender.String(),
 			SenderName:   v.Info.PushName,
 			IsFromMe:     v.Info.IsFromMe,
-			IsGroup:      v.Info.IsGroup,
+			IsGroup:      v.Info.IsGroup && enableGroupHandling,
 			IsEphemeral:  v.IsEphemeral,
 			IsViewOnce:   v.IsViewOnce,
 			Timestamp:    v.Info.Timestamp.String(),
@@ -92,20 +93,20 @@ func (k *Controller) eventHandler(evt interface{}) {
 
 				quotedContent := fmt.Sprintf("%s\n%s", participant, quotedConversation)
 
-				attachmentHandlers := map[string]func(*waE2E.Message){
-					"image": func(m *waE2E.Message) {
+				attachmentHandlers := map[string]func(*waProto.Message){
+					"image": func(m *waProto.Message) {
 						attachment.File, _ = k.client.DownloadAny(m)
 						attachment.Filename = getFilename("image", m)
 					},
-					"video": func(m *waE2E.Message) {
+					"video": func(m *waProto.Message) {
 						attachment.File, _ = k.client.DownloadAny(m)
 						attachment.Filename = getFilename("video", m)
 					},
-					"audio": func(m *waE2E.Message) {
+					"audio": func(m *waProto.Message) {
 						attachment.File, _ = k.client.DownloadAny(m)
 						attachment.Filename = getFilename("audio", m)
 					},
-					"location": func(m *waE2E.Message) {
+					"location": func(m *waProto.Message) {
 						mapsUrl := "https://maps.google.com"
 						latitude := *m.LocationMessage.DegreesLatitude
 						longitude := *m.LocationMessage.DegreesLongitude
@@ -203,7 +204,7 @@ func (k *Controller) eventHandler(evt interface{}) {
 			mess.Caption = locationUrl
 		}
 
-		if mess.IsGroup {
+		if mess.IsGroup && enableGroupHandling {
 			if v.Message.ExtendedTextMessage != nil {
 				if v.Message.ExtendedTextMessage.ContextInfo == nil {
 					if mess.IsFromMe {
@@ -311,7 +312,7 @@ func addAttachment(writer *multipart.Writer, attachment dto.MessageAttachment) e
 	return err
 }
 
-func getFilename(mediaType string, message *waE2E.Message) string {
+func getFilename(mediaType string, message *waProto.Message) string {
 	type fileExtractor func() string
 
 	// Map MIME types to file extensions

@@ -8,13 +8,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v2"
 	"github.com/hiddensetup/w/app/dto"
 	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/proto/waE2E"
+	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
 )
@@ -46,6 +45,7 @@ func (k *Controller) SendMessage(c *fiber.Ctx) error {
 
 	_, err = k.client.SendMessage(context.Background(), jid, message)
 	if err != nil {
+		// Log the error
 		k.client.Log.Errorf("Error sending message: %s", err.Error())
 		return c.JSON(dto.Response{Status: false})
 	}
@@ -55,46 +55,45 @@ func (k *Controller) SendMessage(c *fiber.Ctx) error {
 
 func (k *Controller) LastMessage(c *fiber.Ctx) error {
 	l := len(messageList)
+
 	if l == 0 {
 		return c.SendStatus(404)
 	}
+
 	return c.JSON(messageList[l-1])
 }
 
-func (k *Controller) makeMessage(input *whatsappMessage) (*waE2E.Message, error) {
-	message := &waE2E.Message{}
+func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, error) {
+	message := waProto.Message{}
 
 	if len(input.Media) > 0 {
-		// Create a new HTTP client with a timeout
-		client := &http.Client{
-			Timeout: 90 * time.Second,
-		}
-
-		// Use the client to make the GET request
-		resp, err := client.Get(input.Media)
+		resp, err := http.Get(input.Media)
 		if err != nil {
-			return nil, errors.New("error getting media file by URL: " + err.Error())
+			return nil, errors.New("error getting media file by url")
 		}
-
 		defer resp.Body.Close()
 
 		file, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, errors.New("error reading file body: " + err.Error())
+			return nil, errors.New("error reading file body")
 		}
 
 		mtype := mimetype.Detect(file)
 		mimeType := mtype.String()
-		mess := input.Message
-
+		mess := ""
+		if len(input.Message) > 0 {
+			mess = input.Message
+		}
 		switch mimeType {
-		case "image/jpeg", "image/png":
+		case "image/jpeg":
+			fallthrough
+		case "image/png":
 			resp, err := k.client.Upload(context.Background(), file, whatsmeow.MediaImage)
 			if err != nil {
 				return nil, errors.New("error uploading image: " + err.Error())
 			}
 
-			message.ImageMessage = &waE2E.ImageMessage{
+			message.ImageMessage = &waProto.ImageMessage{
 				Caption:       proto.String(mess),
 				Mimetype:      proto.String(mimeType),
 				URL:           &resp.URL,
@@ -104,14 +103,23 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waE2E.Message, error)
 				FileSHA256:    resp.FileSHA256,
 				FileLength:    &resp.FileLength,
 			}
-
-		case "audio/ogg", "audio/mp3", "audio/mp4", "audio/mpeg", "audio/amr":
+		case "audio/ogg":
+			mimeType = "audio/ogg; codecs=opus"
+			fallthrough
+		case "audio/mp3":
+			fallthrough
+		case "audio/mp4":
+			fallthrough
+		case "audio/mpeg":
+			fallthrough
+		case "audio/amr":
 			resp, err := k.client.Upload(context.Background(), file, whatsmeow.MediaAudio)
 			if err != nil {
-				return nil, errors.New("error uploading audio file: " + err.Error())
+				return nil, errors.New("error uploading file")
 			}
 
-			message.AudioMessage = &waE2E.AudioMessage{
+			message.AudioMessage = &waProto.AudioMessage{
+				//	Caption:       proto.String(""),
 				Mimetype:      proto.String(mimeType),
 				URL:           &resp.URL,
 				DirectPath:    &resp.DirectPath,
@@ -120,14 +128,13 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waE2E.Message, error)
 				FileSHA256:    resp.FileSHA256,
 				FileLength:    &resp.FileLength,
 			}
-
 		case "video/mp4":
 			resp, err := k.client.Upload(context.Background(), file, whatsmeow.MediaVideo)
 			if err != nil {
-				return nil, errors.New("error uploading video file: " + err.Error())
+				return nil, errors.New("error uploading file")
 			}
 
-			message.VideoMessage = &waE2E.VideoMessage{
+			message.VideoMessage = &waProto.VideoMessage{
 				Caption:       proto.String(mess),
 				Mimetype:      proto.String(mimeType),
 				URL:           &resp.URL,
@@ -137,17 +144,17 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waE2E.Message, error)
 				FileSHA256:    resp.FileSHA256,
 				FileLength:    &resp.FileLength,
 			}
-
 		default:
 			resp, err := k.client.Upload(context.Background(), file, whatsmeow.MediaDocument)
 			if err != nil {
-				return nil, errors.New("error uploading document file: " + err.Error())
+				return nil, errors.New("error uploading file")
 			}
 
 			u, _ := url.ParseRequestURI(input.Media)
 
-			message.DocumentMessage = &waE2E.DocumentMessage{
-				Title:         proto.String(getFileName(u.Path)),
+			message.DocumentMessage = &waProto.DocumentMessage{
+				//Caption:       proto.String(""),
+				Title:         proto.String(u.Path),
 				Mimetype:      proto.String(mimeType),
 				URL:           &resp.URL,
 				DirectPath:    &resp.DirectPath,
@@ -155,14 +162,14 @@ func (k *Controller) makeMessage(input *whatsappMessage) (*waE2E.Message, error)
 				FileEncSHA256: resp.FileEncSHA256,
 				FileSHA256:    resp.FileSHA256,
 				FileLength:    &resp.FileLength,
-				FileName:      proto.String(getFileName(u.Path)),
+				FileName:      proto.String(getFileName(u.Path)), // add this line to set the filename
 			}
 		}
 	} else {
 		message.Conversation = proto.String(input.Message)
 	}
 
-	return message, nil
+	return &message, nil
 }
 
 func getFileName(path string) string {
@@ -173,17 +180,16 @@ func getFileName(path string) string {
 func parseJID(rec string) (types.JID, bool) {
 	if !strings.ContainsRune(rec, '@') {
 		return types.NewJID(rec, types.DefaultUserServer), true
+	} else {
+		recipient, err := types.ParseJID(rec)
+		if err != nil {
+			log.Printf("Invalid JID %s: %v", rec, err)
+			return recipient, false
+		} else if recipient.User == "" {
+			log.Printf("Invalid JID %s: no server specified", rec)
+			return recipient, false
+		}
+		log.Printf("JID OK: %s", recipient.String())
+		return recipient, true
 	}
-
-	recipient, err := types.ParseJID(rec)
-	if err != nil {
-		log.Printf("Invalid JID %s: %v", rec, err)
-		return recipient, false
-	} else if recipient.User == "" {
-		log.Printf("Invalid JID %s: no server specified", rec)
-		return recipient, false
-	}
-
-	log.Printf("JID OK: %s", recipient.String())
-	return recipient, true
 }
