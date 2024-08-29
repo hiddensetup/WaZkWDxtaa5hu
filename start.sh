@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# Define the path to your binary and the .env file
-BINARY_PATH="./w"   # Update with the path to your binary
+# Define the .env file path
 ENV_FILE=".env"
+
+# Function to get the BINARY_NAME from the .env file
+get_binary_name() {
+  grep "^BINARY_NAME=" "$ENV_FILE" | cut -d'=' -f2
+}
 
 # Function to get the PID from the .env file
 get_pid() {
@@ -29,8 +33,9 @@ stop_process() {
 
 # Function to start the process
 start_process() {
+  local binary_path="$1"
   echo "Starting the application..."
-  "$BINARY_PATH" &
+  "$binary_path" &
   local new_pid=$!
   echo "Application started with PID $new_pid"
   # Update the PID in the .env file
@@ -61,7 +66,35 @@ update_env_file() {
   mv "$temp_file" "$ENV_FILE"
 }
 
+# Function to build the binary
+build_binary() {
+  local binary_name="$1"
+  echo "Building binary $binary_name..."
+  go build -o "$binary_name" .
+  if [ $? -ne 0 ]; then
+    echo "Failed to build binary $binary_name."
+    exit 1
+  fi
+  echo "Binary $binary_name built successfully."
+}
+
 # Main script logic
+BINARY_NAME=$(get_binary_name)
+if [ -z "$BINARY_NAME" ]; then
+  echo "BINARY_NAME not found in $ENV_FILE."
+  exit 1
+fi
+
+# Define the path to the binary using BINARY_NAME
+BINARY_PATH="./$BINARY_NAME"
+
+# Check if binary exists
+if [ ! -f "$BINARY_PATH" ]; then
+  echo "Binary $BINARY_NAME not found. Building..."
+  build_binary "$BINARY_NAME"
+fi
+
+# Get the PID from the .env file
 PID=$(get_pid)
 
 # Stop the existing process if running
@@ -71,7 +104,7 @@ else
   echo "No PID found in $ENV_FILE. Starting a new process."
 fi
 
-# Start the new process
-start_process
+# Start the process
+start_process "$BINARY_PATH"
 
 echo "Operation completed."

@@ -1,11 +1,11 @@
 Download Go using wget:
  
-wget https://golang.org/dl/go1.20.linux-amd64.tar.gz
+wget https://golang.org/dl/go1.20.6.linux-amd64.tar.gz 
 Replace go1.20.linux-amd64.tar.gz with the correct filename for the version you downloaded.
 
 Extract the downloaded archive:
 
-tar -C /usr/local -xzf go1.20.linux-amd64.tar.gz
+tar -C /usr/local -xzf go1.20.6.linux-amd64.tar.gz 
 
 
 export GOROOT=/usr/local/go

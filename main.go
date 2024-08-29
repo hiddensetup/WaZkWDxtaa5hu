@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -18,9 +20,18 @@ import (
 )
 
 func main() {
-	err := godotenv.Load(".env")
-	if err != nil {
+	if err := godotenv.Load(".env"); err != nil {
 		log.Fatal("Error loading .env file")
+	}
+
+	binaryName := os.Getenv("BINARY_NAME")
+	if binaryName == "" {
+		log.Fatal("BINARY_NAME not set in .env file")
+	}
+
+	// Check and rename if necessary
+	if err := checkAndRenameBinary(binaryName); err != nil {
+		log.Fatal("Error checking or renaming binary:", err)
 	}
 
 	// Write the PID to the .env file
@@ -99,4 +110,47 @@ func updatePIDInEnv() error {
 	}
 
 	return nil
+}
+
+func checkAndRenameBinary(expectedName string) error {
+	currentPath, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	currentName := filepath.Base(currentPath)
+
+	if currentName != expectedName {
+		newPath := filepath.Join(filepath.Dir(currentPath), expectedName)
+		if err := os.Rename(currentPath, newPath); err != nil {
+			return err
+		}
+
+		// Restart the application with the new name
+		cmd := fmt.Sprintf("%s %s", newPath, strings.Join(os.Args[1:], " "))
+		if err := executeCommand(cmd); err != nil {
+			return err
+		}
+		os.Exit(0) // Exit the current process
+	}
+
+	return nil
+}
+
+func executeCommand(cmd string) error {
+	// Use exec.Command to execute the new command
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		return fmt.Errorf("no command to execute")
+	}
+
+	command := parts[0]
+	args := parts[1:]
+
+	c := exec.Command(command, args...)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	c.Stdin = os.Stdin
+
+	return c.Run()
 }
