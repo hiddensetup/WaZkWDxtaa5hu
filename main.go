@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/hiddensetup/w/app/controllers"
@@ -17,10 +19,13 @@ import (
 
 func main() {
 	err := godotenv.Load(".env")
-	// log.Fatal(">>>")
-
 	if err != nil {
 		log.Fatal("Error loading .env file")
+	}
+
+	// Write the PID to the .env file
+	if err := updatePIDInEnv(); err != nil {
+		log.Fatal("Error updating PID in .env file:", err)
 	}
 
 	app := fiber.New()
@@ -41,11 +46,57 @@ func main() {
 		if err := controller.Autologin(); err != nil {
 			log.Fatal("Error auto connect WhatsApp")
 		}
-
 	}
 
 	if err := app.Listen(fmt.Sprintf(":%s", os.Getenv("PORT"))); err != nil {
 		fmt.Println("new error emitted: ", err)
 		log.Fatal("error starting http server")
 	}
+}
+
+func updatePIDInEnv() error {
+	pid := os.Getpid()
+	pidStr := fmt.Sprintf("PID=%d\n", pid)
+
+	// Read the existing .env file and write back to it, excluding old PID lines
+	file, err := os.Open(".env")
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	var lines []string
+	if err == nil {
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !strings.HasPrefix(line, "PID=") {
+				lines = append(lines, line)
+			}
+		}
+		file.Close()
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+	}
+
+	// Open the .env file for writing
+	file, err = os.OpenFile(".env", os.O_TRUNC|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Write the lines back to the file
+	for _, line := range lines {
+		if _, err := file.WriteString(line + "\n"); err != nil {
+			return err
+		}
+	}
+
+	// Write the new PID to the file
+	if _, err := file.WriteString(pidStr); err != nil {
+		return err
+	}
+
+	return nil
 }
