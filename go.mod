@@ -3,12 +3,12 @@ module github.com/hiddensetup/w
 go 1.18
 
 require (
-	github.com/gabriel-vasile/mimetype v1.4.4
+	github.com/gabriel-vasile/mimetype v1.4.5
 	// github.com/gofiber/fiber/v2 v2.52.0
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
-	go.mau.fi/whatsmeow v0.0.0-20240716084021-eb41d1f09552
+	go.mau.fi/whatsmeow v0.0.0-20240828153534-8acde1ba8592
 	google.golang.org/protobuf v1.34.2
 )
 
@@ -29,8 +29,8 @@ require (
 	github.com/valyala/fasthttp v1.55.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	go.mau.fi/libsignal v0.1.1 // indirect
-	go.mau.fi/util v0.6.0 // indirect
-	golang.org/x/crypto v0.25.0 // indirect
-	golang.org/x/net v0.27.0 // indirect
-	golang.org/x/sys v0.22.0 // indirect
+	go.mau.fi/util v0.7.0 // indirect
+	golang.org/x/crypto v0.26.0 // indirect
+	golang.org/x/net v0.28.0 // indirect
+	golang.org/x/sys v0.24.0 // indirect
 )

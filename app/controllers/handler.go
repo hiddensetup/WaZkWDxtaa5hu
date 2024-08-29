@@ -156,7 +156,7 @@ func (k *Controller) eventHandler(evt interface{}) {
 
 		if v.Message.ReactionMessage != nil && v.Message.ReactionMessage.Text != nil {
 			reaction := *v.Message.ReactionMessage.Text
-			mess.Conversation = fmt.Sprintf("#%s", reaction)
+			mess.Conversation = fmt.Sprintf("%s", reaction)
 		}
 
 		if v.Message.ContactMessage != nil {
