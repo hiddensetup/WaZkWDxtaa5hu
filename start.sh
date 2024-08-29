@@ -126,33 +126,43 @@ find_existing_binary() {
   if [ ${#existing_binaries[@]} -gt 0 ]; then
     echo "Found existing binaries:"
     local index=1
+    local binary_found=0
     for binary in "${existing_binaries[@]}"; do
       echo "  $index) ${binary}"
+      if [[ "$(basename "$binary")" == "$BINARY_NAME" ]]; then
+        binary_found=1
+        echo "Binary $BINARY_NAME already exists. Skipping build process and running the binary."
+        # Start the process with the existing binary
+        start_process "$binary"
+        return
+      fi
       index=$((index + 1))
     done
 
-    read -p "Would you like to use one of these binaries instead of building a new one? (y/n): " use_existing
-    if [[ "$use_existing" == "y" || "$use_existing" == "Y" ]]; then
-      read -p "Enter the number of the binary you want to use: " chosen_number
-      if [[ "$chosen_number" =~ ^[0-9]+$ ]] && [ "$chosen_number" -ge 1 ] && [ "$chosen_number" -le "${#existing_binaries[@]}" ]; then
-        local chosen_binary="${existing_binaries[$((chosen_number - 1))]}"
-        local binary_name=$(get_binary_name)
+    if [ "$binary_found" -eq 0 ]; then
+      read -p "Would you like to use one of these binaries instead of building a new one? (y/n): " use_existing
+      if [[ "$use_existing" == "y" || "$use_existing" == "Y" ]]; then
+        read -p "Enter the number of the binary you want to use: " chosen_number
+        if [[ "$chosen_number" =~ ^[0-9]+$ ]] && [ "$chosen_number" -ge 1 ] && [ "$chosen_number" -le "${#existing_binaries[@]}" ]; then
+          local chosen_binary="${existing_binaries[$((chosen_number - 1))]}"
+          local binary_name=$(get_binary_name)
 
-        if [[ -n "$binary_name" ]]; then
-          echo "Renaming existing binary to $binary_name..."
-          mv "$chosen_binary" "./$binary_name"
-          echo "Binary renamed to $binary_name."
-          echo "Updating .env with the new BINARY_NAME..."
+          if [[ -n "$binary_name" ]]; then
+            echo "Renaming existing binary to $binary_name..."
+            mv "$chosen_binary" "./$binary_name"
+            echo "Binary renamed to $binary_name."
+            echo "Updating .env with the new BINARY_NAME..."
 
-          # Update the .env file with the new binary name
-          sed -i "s|^BINARY_NAME=.*|BINARY_NAME=$binary_name|g" "$ENV_FILE"
+            # Update the .env file with the new binary name
+            sed -i "s|^BINARY_NAME=.*|BINARY_NAME=$binary_name|g" "$ENV_FILE"
+          else
+            echo "BINARY_NAME not found in $ENV_FILE. Cannot rename the binary."
+            exit 1
+          fi
         else
-          echo "BINARY_NAME not found in $ENV_FILE. Cannot rename the binary."
+          echo "Invalid option selected. Exiting."
           exit 1
         fi
-      else
-        echo "Invalid option selected. Exiting."
-        exit 1
       fi
     fi
   fi
