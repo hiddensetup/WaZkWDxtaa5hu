@@ -3,6 +3,47 @@
 # Define the .env file path
 ENV_FILE=".env"
 
+# Function to create a new .env file with default values
+create_env_file() {
+  echo "Creating new .env file..."
+
+  # Default values
+  API_KEY="EAApH1KmWEt0BO5M"
+  
+  # Prompt user for the middle part of the URL path
+  read -p "Enter the middle path for PROXY_URL (default: 'your_path'): " MIDDLE_PATH
+  MIDDLE_PATH=${MIDDLE_PATH:-"your_path"}
+  PROXY_URL="https://localhost/apps/$MIDDLE_PATH/api.php"
+  
+  LOG_LEVEL="ERROR"
+  
+  read -p "Enter PORT: " PORT
+  while ! [[ "$PORT" =~ ^[0-9]+$ ]]; do
+    echo "Invalid port. Please enter a numeric value."
+    read -p "Enter PORT: " PORT
+  done
+
+  AUTO_LOGIN="1"
+  
+  read -p "Enter BINARY_NAME: " BINARY_NAME
+  while [[ -z "$BINARY_NAME" ]]; do
+    echo "BINARY_NAME cannot be empty. Please enter a valid binary name."
+    read -p "Enter BINARY_NAME: " BINARY_NAME
+  done
+
+  # Writing values to the .env file
+  cat <<EOL > "$ENV_FILE"
+API_KEY=$API_KEY
+PROXY_URL=$PROXY_URL
+LOG_LEVEL=$LOG_LEVEL
+PORT=$PORT
+AUTO_LOGIN=$AUTO_LOGIN
+BINARY_NAME=$BINARY_NAME
+EOL
+
+  echo ".env file created successfully."
+}
+
 # Function to get the BINARY_NAME from the .env file
 get_binary_name() {
   grep "^BINARY_NAME=" "$ENV_FILE" | cut -d'=' -f2
@@ -79,6 +120,10 @@ build_binary() {
 }
 
 # Main script logic
+if [ ! -f "$ENV_FILE" ]; then
+  create_env_file
+fi
+
 BINARY_NAME=$(get_binary_name)
 if [ -z "$BINARY_NAME" ]; then
   echo "BINARY_NAME not found in $ENV_FILE."
