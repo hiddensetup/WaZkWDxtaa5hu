@@ -135,7 +135,7 @@ func (k *Controller) ExecuteScript(c *fiber.Ctx) error {
 }
 
 func (k *Controller) Off(c *fiber.Ctx) error {
-	scriptPath := "./off.sh"
+	scriptPath := "./stop.sh"
 
 	// Execute the script
 	cmd := exec.Command("bash", scriptPath)
