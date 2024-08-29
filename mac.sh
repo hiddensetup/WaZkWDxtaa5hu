@@ -121,7 +121,7 @@ build_binary() {
 
 # Function to find an existing binary in the current directory
 find_existing_binary() {
-  local existing_binaries=($(find . -maxdepth 1 -type f -executable -not -name "*.sh" -not -name "*.env" -not -name "*.go" -not -name "*.mod" -not -name "*.sum"))
+  local existing_binaries=($(find . -maxdepth 1 -type f -perm +111 -not -name "*.sh" -not -name "*.env" -not -name "*.go" -not -name "*.mod" -not -name "*.sum"))
 
   if [ ${#existing_binaries[@]} -gt 0 ]; then
     echo "Found existing binaries:"
@@ -145,7 +145,7 @@ find_existing_binary() {
           echo "Updating .env with the new BINARY_NAME..."
 
           # Update the .env file with the new binary name
-          sed -i "s|^BINARY_NAME=.*|BINARY_NAME=$binary_name|g" "$ENV_FILE"
+          sed -i '' "s|^BINARY_NAME=.*|BINARY_NAME=$binary_name|g" "$ENV_FILE"
         else
           echo "BINARY_NAME not found in $ENV_FILE. Cannot rename the binary."
           exit 1
@@ -157,6 +157,7 @@ find_existing_binary() {
     fi
   fi
 }
+
 
 # Main script logic
 if [ ! -f "$ENV_FILE" ]; then
