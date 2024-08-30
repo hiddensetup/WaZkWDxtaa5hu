@@ -11,3 +11,5 @@ wa
 salescomercial
 2whatsappstore.db
 -whatsappstore.db
+go.mod
+go.sum

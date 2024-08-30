@@ -131,7 +131,15 @@ find_existing_binary() {
       echo "  $index) ${binary}"
       if [[ "$(basename "$binary")" == "$BINARY_NAME" ]]; then
         binary_found=1
-        echo "Binary $BINARY_NAME already exists. Skipping build process and running the binary."
+        echo "Binary $BINARY_NAME already exists. Stopping existing process if running..."
+        
+        # Find and stop the running process for the existing binary
+        local running_pid=$(pgrep -f "$(basename "$binary")")
+        if [ -n "$running_pid" ]; then
+          stop_process "$running_pid"
+        fi
+        
+        echo "Starting the application with existing binary..."
         # Start the process with the existing binary
         start_process "$binary"
         return
