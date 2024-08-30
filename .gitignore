@@ -1,15 +1,7 @@
-.idea
-go-whatsapp-proxy
-coverage.out
 whatsappstore.db
 .DS_Store
-w1
 w
 .env
-onservice
 wa
-salescomercial
-2whatsappstore.db
--whatsappstore.db
 go.mod
 go.sum
