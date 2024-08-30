@@ -4,7 +4,6 @@ wget https://golang.org/dl/go1.20.6.linux-amd64.tar.gz
 Replace go1.20.linux-amd64.tar.gz with the correct filename for the version you downloaded.
 
 Extract the downloaded archive:
-
 tar -C /usr/local -xzf go1.20.6.linux-amd64.tar.gz 
 
 
@@ -12,5 +11,19 @@ export GOROOT=/usr/local/go
 export GOPATH=$HOME/go
 export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 
-
 source ~/.bashrc   # or source ~/.zshrc
+
+
+
+# Use Node.js version 20.10
+nvm install v20.10
+nvm use v20.10
+
+# Update npm to version 10.8.3
+npm install -g npm@10.8.3
+
+# Install required packages
+npm install @google/generative-ai dotenv
+
+# Install pm2 globally
+npm install -g pm2
