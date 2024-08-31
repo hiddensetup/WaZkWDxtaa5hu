@@ -3,9 +3,16 @@
 # Define the .env file path
 ENV_FILE=".env"
 
+# Define colors
+COLOR_RESET="\033[0m"
+COLOR_GREEN="\033[32m"
+COLOR_RED="\033[31m"
+COLOR_YELLOW="\033[33m"
+COLOR_CYAN="\033[36m"
+
 # Function to create a new .env file with default values
 create_env_file() {
-  echo "Creating new .env file..."
+  echo -e "${COLOR_GREEN}Creating new .env file...${COLOR_RESET}"
 
   # Default values
   API_KEY="EAApH1KmWEt0BO5M"
@@ -19,7 +26,7 @@ create_env_file() {
   
   read -p "Enter PORT: " PORT
   while ! [[ "$PORT" =~ ^[0-9]+$ ]]; do
-    echo "Invalid port. Please enter a numeric value."
+    echo -e "${COLOR_RED}Invalid port. Please enter a numeric value.${COLOR_RESET}"
     read -p "Enter PORT: " PORT
   done
 
@@ -27,7 +34,7 @@ create_env_file() {
   
   read -p "Enter BINARY_NAME: " BINARY_NAME
   while [[ -z "$BINARY_NAME" ]]; do
-    echo "BINARY_NAME cannot be empty. Please enter a valid binary name."
+    echo -e "${COLOR_RED}BINARY_NAME cannot be empty. Please enter a valid binary name.${COLOR_RESET}"
     read -p "Enter BINARY_NAME: " BINARY_NAME
   done
 
@@ -41,7 +48,7 @@ AUTO_LOGIN=$AUTO_LOGIN
 BINARY_NAME=$BINARY_NAME
 EOL
 
-  echo ".env file created successfully."
+  echo -e "${COLOR_GREEN}.env file created successfully.${COLOR_RESET}"
 }
 
 # Function to get the BINARY_NAME from the .env file
@@ -58,16 +65,16 @@ get_pid() {
 stop_process() {
   local pid="$1"
   if [ -z "$pid" ]; then
-    echo "No PID found to stop."
+    echo -e "${COLOR_RED}No PID found to stop.${COLOR_RESET}"
     return 1
   fi
 
-  echo "Stopping process with PID $pid..."
+  echo -e "${COLOR_YELLOW}Stopping process with PID $pid...${COLOR_RESET}"
   kill "$pid" 2>/dev/null
   if [ $? -eq 0 ]; then
-    echo "Process $pid stopped."
+    echo -e "${COLOR_GREEN}Process $pid stopped.${COLOR_RESET}"
   else
-    echo "Failed to stop process $pid or process does not exist."
+    echo -e "${COLOR_RED}Failed to stop process $pid or process does not exist.${COLOR_RESET}"
     return 1
   fi
 }
@@ -75,10 +82,10 @@ stop_process() {
 # Function to start the process
 start_process() {
   local binary_path="$1"
-  echo "Starting the application..."
+  echo -e "${COLOR_YELLOW}Starting the application...${COLOR_RESET}"
   "$binary_path" &
   local new_pid=$!
-  echo "Application started with PID $new_pid"
+  echo -e "${COLOR_GREEN}Application started with PID $new_pid${COLOR_RESET}"
   # Update the PID in the .env file
   update_env_file "$new_pid"
 }
@@ -110,13 +117,13 @@ update_env_file() {
 # Function to build the binary
 build_binary() {
   local binary_name="$1"
-  echo "Building binary $binary_name..."
+  echo -e "${COLOR_YELLOW}Building binary $binary_name...${COLOR_RESET}"
   go build -o "$binary_name" .
   if [ $? -ne 0 ]; then
-    echo "Failed to build binary $binary_name."
+    echo -e "${COLOR_RED}Failed to build binary $binary_name.${COLOR_RESET}"
     exit 1
   fi
-  echo "Binary $binary_name built successfully."
+  echo -e "${COLOR_GREEN}Binary $binary_name built successfully.${COLOR_RESET}"
 }
 
 # Function to find an existing binary in the current directory
@@ -124,14 +131,14 @@ find_existing_binary() {
   local existing_binaries=($(find . -maxdepth 1 -type f -executable -not -name "*.sh" -not -name "*.env" -not -name "*.go" -not -name "*.mod" -not -name "*.sum"))
 
   if [ ${#existing_binaries[@]} -gt 0 ]; then
-    echo "Found existing binaries:"
+    echo -e "${COLOR_CYAN}Found existing binaries:${COLOR_RESET}"
     local index=1
     local binary_found=0
     for binary in "${existing_binaries[@]}"; do
-      echo "  $index) ${binary}"
+      echo -e "  ${COLOR_CYAN}$index) ${binary}${COLOR_RESET}"
       if [[ "$(basename "$binary")" == "$BINARY_NAME" ]]; then
         binary_found=1
-        echo "Binary $BINARY_NAME already exists. Stopping existing process if running..."
+        echo -e "${COLOR_YELLOW}Binary $BINARY_NAME already exists. Stopping existing process if running...${COLOR_RESET}"
         
         # Find and stop the running process for the existing binary
         local running_pid=$(pgrep -f "$(basename "$binary")")
@@ -139,7 +146,7 @@ find_existing_binary() {
           stop_process "$running_pid"
         fi
         
-        echo "Starting the application with existing binary..."
+        echo -e "${COLOR_YELLOW}Starting the application with existing binary...${COLOR_RESET}"
         # Start the process with the existing binary
         start_process "$binary"
         return
@@ -156,19 +163,19 @@ find_existing_binary() {
           local binary_name=$(get_binary_name)
 
           if [[ -n "$binary_name" ]]; then
-            echo "Renaming existing binary to $binary_name..."
+            echo -e "${COLOR_YELLOW}Renaming existing binary to $binary_name...${COLOR_RESET}"
             mv "$chosen_binary" "./$binary_name"
-            echo "Binary renamed to $binary_name."
-            echo "Updating .env with the new BINARY_NAME..."
+            echo -e "${COLOR_GREEN}Binary renamed to $binary_name.${COLOR_RESET}"
+            echo -e "${COLOR_YELLOW}Updating .env with the new BINARY_NAME...${COLOR_RESET}"
 
             # Update the .env file with the new binary name
             sed -i "s|^BINARY_NAME=.*|BINARY_NAME=$binary_name|g" "$ENV_FILE"
           else
-            echo "BINARY_NAME not found in $ENV_FILE. Cannot rename the binary."
+            echo -e "${COLOR_RED}BINARY_NAME not found in $ENV_FILE. Cannot rename the binary.${COLOR_RESET}"
             exit 1
           fi
         else
-          echo "Invalid option selected. Exiting."
+          echo -e "${COLOR_RED}Invalid option selected. Exiting.${COLOR_RESET}"
           exit 1
         fi
       fi
@@ -183,7 +190,7 @@ fi
 
 BINARY_NAME=$(get_binary_name)
 if [ -z "$BINARY_NAME" ]; then
-  echo "BINARY_NAME not found in $ENV_FILE."
+  echo -e "${COLOR_RED}BINARY_NAME not found in $ENV_FILE.${COLOR_RESET}"
   exit 1
 fi
 
@@ -195,7 +202,7 @@ BINARY_PATH="./$BINARY_NAME"
 
 # Check if binary exists
 if [ ! -f "$BINARY_PATH" ]; then
-  echo "Binary $BINARY_NAME not found. Building..."
+  echo -e "${COLOR_YELLOW}Binary $BINARY_NAME not found. Building...${COLOR_RESET}"
   build_binary "$BINARY_NAME"
 fi
 
@@ -206,10 +213,10 @@ PID=$(get_pid)
 if [ -n "$PID" ]; then
   stop_process "$PID"
 else
-  echo "No PID found in $ENV_FILE. Starting a new process."
+  echo -e "${COLOR_YELLOW}No PID found in $ENV_FILE. Starting a new process.${COLOR_RESET}"
 fi
 
 # Start the process
 start_process "$BINARY_PATH"
 
-echo "Operation completed."
+echo -e "${COLOR_GREEN}Operation completed.${COLOR_RESET}"
