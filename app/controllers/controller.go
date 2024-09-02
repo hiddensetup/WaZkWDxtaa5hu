@@ -102,37 +102,47 @@ func (k *Controller) Autologin() error {
 func (k *Controller) Logout(c *fiber.Ctx) error {
 	// Remove the whatsappstore.db file if it exists
 	if _, err := os.Stat("whatsappstore.db"); err == nil {
+		fmt.Println("File whatsappstore.db exists. Attempting to delete...")
 		if err := os.Remove("whatsappstore.db"); err != nil {
 			// Handle the error more gracefully, log it, and continue
-			log.Printf("Error removing whatsappstore.db: %s", err)
+			fmt.Printf("Error removing whatsappstore.db: %s\n", err)
+			return c.JSON(dto.Response{Status: false})
 		}
+		fmt.Println("File whatsappstore.db successfully deleted.")
+	} else {
+		fmt.Println("File whatsappstore.db does not exist.")
 	}
 
 	// Log out the user
 	if k.client != nil {
 		if err := k.client.Logout(); err != nil {
 			// Handle the error more gracefully, return an error response
+			fmt.Printf("Error logging out: %s\n", err)
 			return c.JSON(dto.Response{Status: false})
 		}
+		fmt.Println("User successfully logged out.")
 	}
 
 	return c.JSON(dto.Response{Status: true})
 }
+
 
 func (k *Controller) ExecuteScript(c *fiber.Ctx) error {
-	scriptPath := "./start.sh"
+    scriptPath := "./start.sh"
 
-	// Execute the script
-	cmd := exec.Command("bash", scriptPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+    // Prepare to capture output and error
+    cmd := exec.Command("bash", scriptPath)
+    output, err := cmd.CombinedOutput()
 
-	if err := cmd.Run(); err != nil {
-		return c.JSON(dto.Response{Status: false})
-	}
+    if err != nil {
+        log.Printf("Error executing script: %s\nOutput: %s", err, string(output))
+        return c.JSON(dto.Response{Status: false})
+    }
 
-	return c.JSON(dto.Response{Status: true})
+    log.Printf("Script output: %s", string(output))
+    return c.JSON(dto.Response{Status: true})
 }
+
 
 func (k *Controller) Off(c *fiber.Ctx) error {
 	scriptPath := "./stop.sh"
