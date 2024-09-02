@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -126,23 +127,21 @@ func (k *Controller) Logout(c *fiber.Ctx) error {
 	return c.JSON(dto.Response{Status: true})
 }
 
-
 func (k *Controller) ExecuteScript(c *fiber.Ctx) error {
-    scriptPath := "./start.sh"
+	scriptPath := "./start.sh"
 
-    // Prepare to capture output and error
-    cmd := exec.Command("bash", scriptPath)
-    output, err := cmd.CombinedOutput()
+	// Prepare to capture output and error
+	cmd := exec.Command("bash", scriptPath)
+	output, err := cmd.CombinedOutput()
 
-    if err != nil {
-        log.Printf("Error executing script: %s\nOutput: %s", err, string(output))
-        return c.JSON(dto.Response{Status: false})
-    }
+	if err != nil {
+		log.Printf("Error executing script: %s\nOutput: %s", err, string(output))
+		return c.JSON(dto.Response{Status: false})
+	}
 
-    log.Printf("Script output: %s", string(output))
-    return c.JSON(dto.Response{Status: true})
+	log.Printf("Script output: %s", string(output))
+	return c.JSON(dto.Response{Status: true})
 }
-
 
 func (k *Controller) Off(c *fiber.Ctx) error {
 	scriptPath := "./stop.sh"
