@@ -59,17 +59,9 @@ func main() {
 		}
 	}
 
-	// Use ListenTLS for HTTPS
-	certFile := os.Getenv("SSL_CERT_FILE")
-	keyFile := os.Getenv("SSL_KEY_FILE")
-
-	if certFile == "" || keyFile == "" {
-		log.Fatal("SSL_CERT_FILE and SSL_KEY_FILE must be set in .env file")
-	}
-
-	if err := app.ListenTLS(fmt.Sprintf(":%s", os.Getenv("PORT")), certFile, keyFile); err != nil {
+	if err := app.Listen(fmt.Sprintf(":%s", os.Getenv("PORT"))); err != nil {
 		fmt.Println("new error emitted: ", err)
-		log.Fatal("error starting https server")
+		log.Fatal("error starting http server")
 	}
 }
 
