@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hiddensetup/w/app/dto"
+	"github.com/hiddensetup/WaZkWDxtaa5hu/app/dto"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"go.mau.fi/whatsmeow/types/events"
 )

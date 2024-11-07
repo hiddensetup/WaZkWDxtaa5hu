@@ -3,8 +3,8 @@ package routes
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/hiddensetup/w/app/controllers"
-	"github.com/hiddensetup/w/app/middlewares"
+	"github.com/hiddensetup/WaZkWDxtaa5hu/app/controllers"
+	"github.com/hiddensetup/WaZkWDxtaa5hu/app/middlewares"
 )
 
 func Setup(app *fiber.App, controller *controllers.Controller) {

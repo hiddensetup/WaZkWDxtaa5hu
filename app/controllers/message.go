@@ -12,7 +12,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v2"
-	"github.com/hiddensetup/w/app/dto"
+	"github.com/hiddensetup/WaZkWDxtaa5hu/app/dto"
 	"go.mau.fi/whatsmeow"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"go.mau.fi/whatsmeow/types"

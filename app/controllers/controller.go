@@ -8,7 +8,7 @@ import (
 	"os/exec"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/hiddensetup/w/app/dto"
+	"github.com/hiddensetup/WaZkWDxtaa5hu/app/dto"
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store"
