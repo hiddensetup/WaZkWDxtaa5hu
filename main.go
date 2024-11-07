@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/hiddensetup/WaZkWDxtaa5hu/app/controllers"
-	"github.com/hiddensetup/WaZkWDxtaa5hu/app/routes"
+	"github.com/hiddensetup/w/app/controllers"
+	"github.com/hiddensetup/w/app/routes"
 	"github.com/joho/godotenv"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	waLog "go.mau.fi/whatsmeow/util/log"
