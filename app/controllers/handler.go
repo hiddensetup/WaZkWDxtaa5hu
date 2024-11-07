@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -28,11 +29,24 @@ func (k *Controller) eventHandler(evt interface{}) {
 	case *events.Message:
 		messageList = append(messageList, *v)
 
+		// Extract caption from image or video messages
+		caption := ""
+		if v.Message.ImageMessage != nil {
+			if v.Message.ImageMessage.Caption != nil {
+				caption = *v.Message.ImageMessage.Caption
+			}
+		}
+		if v.Message.VideoMessage != nil {
+			if v.Message.VideoMessage.Caption != nil {
+				caption = *v.Message.VideoMessage.Caption
+			}
+		}
+
 		// Create a DTO to represent the incoming message
 		mess := dto.IncomingMessage{
 			ID:           v.Info.ID,
 			Chat:         v.Info.Chat.String(),
-			Caption:      "",
+			Caption:      caption,
 			Sender:       v.Info.Sender.String(),
 			SenderName:   v.Info.PushName,
 			IsFromMe:     v.Info.IsFromMe,
@@ -43,6 +57,15 @@ func (k *Controller) eventHandler(evt interface{}) {
 			MediaType:    v.Info.MediaType,
 			Multicast:    v.Info.Multicast,
 			Conversation: v.Message.GetConversation(),
+		}
+
+		// Check if the message is forwarded
+		isForwarded := false
+		if v.Message.ExtendedTextMessage != nil &&
+			v.Message.ExtendedTextMessage.ContextInfo != nil &&
+			v.Message.ExtendedTextMessage.ContextInfo.IsForwarded != nil &&
+			*v.Message.ExtendedTextMessage.ContextInfo.IsForwarded {
+			isForwarded = true
 		}
 
 		// Extract conversation text from extended text messages
@@ -57,6 +80,163 @@ func (k *Controller) eventHandler(evt interface{}) {
 		if mess.MediaType != "" {
 			attachment.File, _ = k.client.DownloadAny(v.Message)
 			attachment.Filename = getFilename(v.Info.MediaType, v.Message)
+		}
+
+		// Handle quoted messages
+		if v.Message.ExtendedTextMessage != nil && v.Message.ExtendedTextMessage.ContextInfo != nil {
+			if v.Message.ExtendedTextMessage.ContextInfo.QuotedMessage != nil {
+				quotedMsg := v.Message.ExtendedTextMessage.ContextInfo.QuotedMessage
+				quotedConversation := ""
+				if quotedMsg.Conversation != nil {
+					quotedConversation = *quotedMsg.Conversation
+				}
+				participant := ""
+				if v.Message.ExtendedTextMessage.ContextInfo.Participant != nil {
+					participant = *v.Message.ExtendedTextMessage.ContextInfo.Participant
+				}
+
+				quotedContent := fmt.Sprintf("%s\n%s", participant, quotedConversation)
+
+				// Handle attachments within quoted messages
+				attachmentHandlers := map[string]func(*waProto.Message){
+					"image": func(m *waProto.Message) {
+						// Handle image attachment within quoted message
+						attachment.File, _ = k.client.DownloadAny(m)
+						attachment.Filename = getFilename("image", m)
+					},
+					"video": func(m *waProto.Message) {
+						// Handle video attachment within quoted message
+						attachment.File, _ = k.client.DownloadAny(m)
+						attachment.Filename = getFilename("video", m)
+					},
+					"audio": func(m *waProto.Message) {
+						// Handle audio attachment within quoted message
+						attachment.File, _ = k.client.DownloadAny(m)
+						attachment.Filename = getFilename("audio", m)
+					},
+					"location": func(m *waProto.Message) {
+						// Handle location attachment within quoted message
+						mapsUrl := "https://maps.google.com"
+						latitude := *m.LocationMessage.DegreesLatitude
+						longitude := *m.LocationMessage.DegreesLongitude
+						locationUrl := fmt.Sprintf("%s/?q=%f,%f", mapsUrl, latitude, longitude)
+						quotedContent = fmt.Sprintf("%s %s\n", quotedContent, locationUrl)
+					},
+				}
+
+				if quotedMsg.ImageMessage != nil {
+					attachmentHandlers["image"](quotedMsg)
+				}
+				if quotedMsg.VideoMessage != nil {
+					attachmentHandlers["video"](quotedMsg)
+				}
+				if quotedMsg.AudioMessage != nil {
+					attachmentHandlers["audio"](quotedMsg)
+				}
+				if quotedMsg.LocationMessage != nil {
+					attachmentHandlers["location"](quotedMsg)
+				}
+
+				// Format quoted message content based on group/individual chat
+				if mess.IsGroup {
+					if mess.Conversation != "" {
+						mess.Conversation = fmt.Sprintf("%s\n[\"%s\"]\n%s", mess.SenderName, quotedContent, mess.Conversation)
+					} else {
+						mess.Conversation = fmt.Sprintf("%s\n[\"%s\"]\n%s", mess.SenderName, quotedContent, mess.Caption)
+					}
+				} else {
+					mess.Conversation = fmt.Sprintf("\n〚%s〛%s", quotedContent, mess.Conversation)
+				}
+			}
+		}
+
+		// Handle forwarded messages
+		if isForwarded {
+			forwardedPrefix := "→Forwarded←\n"
+			if mess.IsGroup {
+				if mess.Conversation != "" {
+					mess.Conversation = fmt.Sprintf("%s%s\n%s", forwardedPrefix, mess.SenderName, mess.Conversation)
+				} else if mess.Caption != "" {
+					mess.Caption = fmt.Sprintf("%s%s\n%s", forwardedPrefix, mess.SenderName, mess.Caption)
+				}
+			} else {
+				mess.Conversation = forwardedPrefix + mess.Conversation
+			}
+		}
+
+		// Handle reaction messages
+		if v.Message.ReactionMessage != nil && v.Message.ReactionMessage.Text != nil {
+			reaction := *v.Message.ReactionMessage.Text
+			mess.Conversation = fmt.Sprintf("%s", reaction)
+		}
+
+		// Handle contact messages
+		if v.Message.ContactMessage != nil {
+			s := *v.Message.ContactMessage.Vcard
+
+			extractValue := func(pattern string, s string) string {
+				re := regexp.MustCompile(pattern)
+				matches := re.FindStringSubmatch(s)
+				if len(matches) > 1 {
+					return strings.TrimSpace(matches[1])
+				}
+				return ""
+			}
+
+			waPhone := extractValue(`TEL.*?:(.+)`, s)
+			waPhone = strings.ReplaceAll(waPhone, " ", "")
+			waPhone = strings.ReplaceAll(waPhone, "-", "")
+
+			waEmail := extractValue(`EMAIL.*?:(.+)`, s)
+			contactName := *v.Message.ContactMessage.DisplayName
+
+			mess.Conversation = fmt.Sprintf("*%s*\n%s\n%s", contactName, waPhone, waEmail)
+			mess.Caption = contactName
+		}
+
+		// Handle location messages
+		if v.Message.LocationMessage != nil {
+			mapsUrl := "https://maps.google.com"
+			latitude := *v.Message.LocationMessage.DegreesLatitude
+			longitude := *v.Message.LocationMessage.DegreesLongitude
+
+			locationUrl := fmt.Sprintf("%s/?q=%f,%f", mapsUrl, latitude, longitude)
+
+			// Format location message content based on quoted message
+			if v.Message.ExtendedTextMessage != nil && v.Message.ExtendedTextMessage.ContextInfo != nil {
+				if v.Message.ExtendedTextMessage.ContextInfo.QuotedMessage != nil {
+					quotedMsg := v.Message.ExtendedTextMessage.ContextInfo.QuotedMessage
+					if quotedMsg.LocationMessage != nil {
+						mess.Conversation = fmt.Sprintf("%s\nReply: %s", mess.Conversation, locationUrl)
+					}
+				} else {
+					mess.Conversation = fmt.Sprintf("%s\n%s", mess.Conversation, locationUrl)
+				}
+			} else {
+				mess.Conversation = "\n" + locationUrl
+			}
+			mess.Caption = locationUrl
+		}
+
+		// Format message content based on group/individual chat
+		if mess.IsGroup && enableGroupHandling {
+			if v.Message.ExtendedTextMessage != nil {
+				if v.Message.ExtendedTextMessage.ContextInfo == nil {
+					if mess.IsFromMe {
+						mess.Conversation = fmt.Sprintf("%s (Me) \n%s", mess.SenderName, mess.Conversation)
+					} else {
+						mess.Conversation = fmt.Sprintf("%s\n%s", mess.SenderName, mess.Conversation)
+					}
+				}
+			} else if mess.MediaType != "" {
+				if caption != "" {
+					mess.Conversation = fmt.Sprintf("%s\n%s", mess.SenderName, caption)
+				} else {
+					mess.Conversation = mess.SenderName
+				}
+			} else {
+				mess.Conversation = fmt.Sprintf("%s\n%s", mess.SenderName, mess.Conversation)
+			}
 		}
 
 		// Proxy message to chat app if not a status broadcast
