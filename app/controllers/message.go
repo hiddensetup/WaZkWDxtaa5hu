@@ -19,14 +19,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// whatsappMessage represents the structure of a message to be sent via WhatsApp.
 type whatsappMessage struct {
 	Receiver string `json:"receiver"`
 	Message  string `json:"message"`
 	Media    string `json:"media"`
 }
 
-// SendMessage handles sending messages to a WhatsApp contact or group.
 func (k *Controller) SendMessage(c *fiber.Ctx) error {
 	mess := whatsappMessage{}
 	if err := c.BodyParser(&mess); err != nil {
@@ -64,7 +62,6 @@ func (k *Controller) SendMessage(c *fiber.Ctx) error {
 	return c.JSON(dto.Response{Status: true})
 }
 
-// LastMessage retrieves the last received WhatsApp message.
 func (k *Controller) LastMessage(c *fiber.Ctx) error {
 	l := len(messageList)
 
@@ -75,7 +72,6 @@ func (k *Controller) LastMessage(c *fiber.Ctx) error {
 	return c.JSON(messageList[l-1])
 }
 
-// makeMessage constructs a WhatsApp message based on the provided input.
 func (k *Controller) makeMessage(input *whatsappMessage) (*waProto.Message, error) {
 	message := waProto.Message{}
 
