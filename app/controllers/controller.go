@@ -16,12 +16,14 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
+// Controller represents the main controller for the WhatsApp web proxy server.
 type Controller struct {
 	dbContainer *sqlstore.Container
 	client      *whatsmeow.Client
 	qrCode      string // Updated to instance variable
 }
 
+// NewController creates a new instance of the Controller.
 func NewController(db *sqlstore.Container) *Controller {
 	cntrl := &Controller{
 		dbContainer: db,
@@ -35,6 +37,7 @@ func NewController(db *sqlstore.Container) *Controller {
 	return cntrl
 }
 
+// Login handles the login process for the WhatsApp web proxy server.
 func (k *Controller) Login(c *fiber.Ctx) error {
 	if k.client.Store.ID == nil {
 		// No ID stored, new login
@@ -88,6 +91,7 @@ func (k *Controller) Login(c *fiber.Ctx) error {
 	return c.JSON(dto.Response{Status: false})
 }
 
+// Autologin automatically logs in the WhatsApp web proxy server if it's already authenticated.
 func (k *Controller) Autologin() error {
 	// autologin only when client is auth
 	if k.client.Store.ID != nil && !k.client.IsConnected() {
